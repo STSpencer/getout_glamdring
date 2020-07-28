@@ -12,7 +12,6 @@ from keras.layers.convolutional import AveragePooling2D
 from keras.layers.core import Activation, Dropout
 from keras import backend as K
 import tensorflow as tf
-from keras.backend.tensorflow_backend import set_session
 from keras.utils import plot_model
 import matplotlib.pyplot as plt 
 from sklearn.preprocessing import StandardScaler
@@ -25,12 +24,11 @@ from sklearn.preprocessing import scale
 from mlxtend.evaluate import confusion_matrix
 from mlxtend.plotting import plot_confusion_matrix
 from keras.metrics import binary_accuracy
-#from ctapipe.image import tailcuts_clean
 from sklearn.metrics import roc_curve, auc
 from sklearn.preprocessing import label_binarize
 from scipy import interp
 from itertools import cycle
-from skimage.restoration import denoise_wavelet, denoise_bilateral
+
 import glob
 global trainevents
 trainevents = []
@@ -97,7 +95,7 @@ def hardcode_valid():
     batchflag='Valid'
     hexmethod='oversampling'
     onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
-    batch_size=20
+    batch_size=50
     """ Generates training/test sequences on demand
     """
 
@@ -194,7 +192,7 @@ def hardcode_train():
     batchflag='Train'
     hexmethod='oversampling'
     onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
-    batch_size=20
+    batch_size=50
     """ Generates training/test sequences on demand
     """
 
@@ -262,7 +260,6 @@ def hardcode_train():
                 chargevals = np.argsort(chargevals)
                 chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
                 trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
-                #Denoising
                     
             training_sample_count = len(trainarr)
             batches = int(training_sample_count / batch_size)
