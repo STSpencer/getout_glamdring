@@ -1,12 +1,63 @@
 '''Uses Keras to train and test a 2dconvlstm on parameterized VERITAS data.
 Written by S.T. Spencer 27/6/2019'''
+import subprocess, re
 
+# Nvidia-smi GPU memory parsing.
+# Tested on nvidia-smi 370.23
+
+def run_command(cmd):
+    """Run command, return output as string."""
+    output = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True).communicate()[0]
+    return output.decode("ascii")
+
+def list_available_gpus():
+    """Returns list of available GPU ids."""
+    output = run_command("nvidia-smi -L")
+    # lines of the form GPU 0: TITAN X
+    gpu_regex = re.compile(r"GPU (?P<gpu_id>\d+):")
+    result = []
+    for line in output.strip().split("\n"):
+        try:
+            m = gpu_regex.match(line)
+            result.append(int(m.group("gpu_id")))
+        except Exception:
+            result.append(0)
+    return result
+
+def gpu_memory_map():
+    """Returns map of GPU id to memory allocated on that GPU."""
+
+    output = run_command("nvidia-smi")
+    gpu_output = output[output.find("GPU Memory"):]
+    # lines of the form
+    # |    0      8734    C   python                                       11705MiB |
+    memory_regex = re.compile(r"[|]\s+?(?P<gpu_id>\d+)\D+?(?P<pid>\d+).+[ ](?P<gpu_memory>\d+)MiB")
+    rows = gpu_output.split("\n")
+    result = {gpu_id: 0 for gpu_id in list_available_gpus()}
+    for row in gpu_output.split("\n"):
+        m = memory_regex.search(row)
+        if not m:
+            continue
+        gpu_id = int(m.group("gpu_id"))
+        gpu_memory = int(m.group("gpu_memory"))
+        result[gpu_id] += gpu_memory
+    return result
+
+def pick_gpu_lowest_memory():
+    """Returns GPU with the least allocated memory"""
+
+    memory_gpu_map = [(memory, gpu_id) for (gpu_id, memory) in gpu_memory_map().items()]
+    best_memory, best_gpu = sorted(memory_gpu_map)[0]
+    return best_gpu
+
+import os
+os.environ["CUDA_DEVICE_ORDER"]='PCI_BUS_ID'
+os.environ["CUDA_VISIBLE_DEVICES"]=str(pick_gpu_lowest_memory())
 import matplotlib as mpl
 mpl.use('Agg')
 import numpy as np
 import h5py
 import keras
-import os
 import tempfile
 import sys
 from keras.utils import HDF5Matrix
@@ -38,12 +89,13 @@ from mlxtend.evaluate import confusion_matrix
 from mlxtend.plotting import plot_confusion_matrix
 from keras.metrics import binary_accuracy
 from sklearn.metrics import roc_curve, auc
-from net_utils import *
+
 import hyperas
 from hyperas import optim
 from hyperas.distributions import choice, uniform
 from hyperopt import Trials, STATUS_OK, tpe, mongoexp
 import pickle
+import tempfile
 
 plt.ioff()
 
@@ -103,7 +155,142 @@ else:
     print('Invalid Hexmethod')
     raise KeyboardInterrupt
 
-def data(onlyfiles,hexmethod):
+def data():
+    def hardcode_valid():
+        hexmethod='oversampling'
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
+        batch_size=50
+        """ Generates training/test sequences on demand
+        """
+        
+        nofiles = 0
+        i = 0  # No. events loaded in total
+        filelist = onlyfiles[10:20]
+        global validevents
+        global valid2
+        validevents=[]
+        valid2=[]
+        for file in filelist:
+            inputdata = h5py.File(file, 'r')
+            validevents = validevents + inputdata['isGamma'][:].tolist()
+            valid2 = valid2 + inputdata['id'][:].tolist()
+            inputdata.close()
+    
+        while True:
+            for file in filelist:
+                try:
+                    inputdata = h5py.File(file, 'r')
+                except OSError:
+                    continue
+                trainarr = np.asarray(inputdata[hexmethod][:, :, :, :])
+                labelsarr = np.asarray(inputdata['isGamma'][:])
+                idarr = np.asarray(inputdata['id'][:])
+                nofiles = nofiles + 1
+                inputdata.close()
+                notrigs=np.shape(trainarr)[0]
+                
+                for x in np.arange(np.shape(trainarr)[0]):
+                    chargevals = []
+                    for y in np.arange(4):
+                        chargevals.append(np.sum(trainarr[x,y,:,:]))
+                        
+                    chargevals = np.argsort(chargevals)
+                    chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
+                    trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
+                training_sample_count = len(trainarr)
+                batches = int(training_sample_count / batch_size)
+                remainder_samples = training_sample_count % batch_size
+                i = i + 1000
+                countarr = np.arange(0, len(labelsarr))
+                #trainarr = (trainarr-np.amin(trainarr,axis=0))/(np.amax(trainarr,axis=0)-np.amin(trainarr,axis=0))
+                if remainder_samples:
+                    batches = batches + 1
+                        # generate batches of samples
+                for idx in list(range(0, batches)):
+                    if idx == batches - 1:
+                        batch_idxs = countarr[idx * batch_size:]
+                    else:
+                        batch_idxs = countarr[idx *
+                                              batch_size:idx *
+                                              batch_size +
+                                              batch_size]
+                    X = trainarr[batch_idxs]
+                    X = np.nan_to_num(X)
+                    Y = keras.utils.to_categorical(
+                        labelsarr[batch_idxs], num_classes=2)
+                    yield (np.array(X), np.array(Y))
+
+    def hardcode_train():
+        hexmethod='oversampling'
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
+        batch_size=50
+        """ Generates training/test sequences on demand
+        """
+        
+        nofiles = 0
+        i = 0  # No. events loaded in total
+        global trainevents
+        global train2
+        trainevents=[]
+        train2=[]
+        filelist = onlyfiles[:10]
+        for file in filelist:
+            try:
+                inputdata = h5py.File(file, 'r')
+            except OSError:
+                continue
+            trainevents = trainevents + inputdata['isGamma'][:].tolist()
+            train2 = train2 + inputdata['id'][:].tolist()
+            inputdata.close()
+    
+        while True:
+            for file in filelist:
+                try:
+                    inputdata = h5py.File(file, 'r')
+                except OSError:
+                    continue
+                trainarr = np.asarray(inputdata[hexmethod][:, :, :, :])
+                labelsarr = np.asarray(inputdata['isGamma'][:])
+                idarr = np.asarray(inputdata['id'][:])
+                nofiles = nofiles + 1
+                inputdata.close()
+                notrigs=np.shape(trainarr)[0]
+                
+                for x in np.arange(np.shape(trainarr)[0]):
+                    chargevals = []
+                    for y in np.arange(4):
+                        chargevals.append(np.sum(trainarr[x,y,:,:]))
+                        
+                    chargevals = np.argsort(chargevals)
+                    chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
+                    trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
+                    
+                training_sample_count = len(trainarr)
+                batches = int(training_sample_count / batch_size)
+                remainder_samples = training_sample_count % batch_size
+                i = i + 1000
+                countarr = np.arange(0, len(labelsarr))
+                    
+                #            trainarr = (trainarr-np.amin(trainarr,axis=0))/(np.amax(trainarr,axis=0)-np.amin(trainarr,axis=0))
+                if remainder_samples:
+                    batches = batches + 1
+                        
+                # generate batches of samples
+                for idx in list(range(0, batches)):
+                    if idx == batches - 1:
+                        batch_idxs = countarr[idx * batch_size:]
+                    else:
+                        batch_idxs = countarr[idx *
+                                              batch_size:idx *
+                                              batch_size +
+                                              batch_size]
+                    X = trainarr[batch_idxs]
+                    X = np.nan_to_num(X)
+                    Y = keras.utils.to_categorical(
+                        labelsarr[batch_idxs], num_classes=2)
+                    yield (np.array(X), np.array(Y))
+
+
     train_generator=hardcode_train()
     validation_generator=hardcode_valid()
     return train_generator, validation_generator
@@ -151,7 +338,7 @@ def create_model(train_generator,validation_generator):
     lentrain=19574
     lentruth=19600
 # Train the network
-    history = model.fit_generator(
+    history = model.fit(
         train_generator,
         steps_per_epoch=lentrain/50.0,
         epochs=1,
@@ -160,11 +347,21 @@ def create_model(train_generator,validation_generator):
         use_multiprocessing=False,
         shuffle=True,validation_data=validation_generator,validation_steps=lentruth/50.0)
     score, acc=model.evaluate(validation_generator,steps=lentruth/50.0)
-    return{'loss':-acc,'status': STATUS_OK, 'model':model}
+    out = {'loss': -acc,
+        'score': score,
+        'status': STATUS_OK,
+        'model_params': model.summary()
+    }
+    # optionally store a dump of your model here so you can get it from the database later                                                                                                   
+    temp_name = tempfile.gettempdir()+'/'+next(tempfile._get_candidate_names()) + '.h5'
+    model.save(temp_name)
+    with open(temp_name, 'rb') as infile:
+        model_bytes = infile.read()
+    out['model_serial'] = model_bytes
+    return out
 
     # Plot training accuracy/loss.
 
-train_generator,validation_generator=data(onlyfiles,hexmethod)
 trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/jobs/jobs',exp_key=runname)
 
 run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=300,trials=trialsinit,keep_temp=True)
