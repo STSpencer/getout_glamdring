@@ -1,11 +1,6 @@
 #coding=utf-8
 
 try:
-    import subprocess, re
-except:
-    pass
-
-try:
     import os
 except:
     pass
