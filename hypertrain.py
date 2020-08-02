@@ -1,8 +1,6 @@
 '''Uses Keras to train and test a 2dconvlstm on parameterized VERITAS data.
 Written by S.T. Spencer 27/6/2019'''
 import os
-os.environ["CUDA_DEVICE_ORDER"]='PCI_BUS_ID'
-os.environ["CUDA_VISIBLE_DEVICES"]='0,1'
 import matplotlib as mpl
 mpl.use('Agg')
 import numpy as np
@@ -10,6 +8,11 @@ import h5py
 import keras
 import tempfile
 import sys
+import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import Session
+
 from keras.utils import HDF5Matrix
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout, Conv2D, ConvLSTM2D, MaxPooling2D, BatchNormalization, Conv3D, GlobalAveragePooling3D
@@ -20,8 +23,7 @@ from keras.layers.core import Dropout
 from keras.layers import Input, GaussianNoise
 from keras.models import Model
 from keras.layers import concatenate
-from keras import backend as K
-import tensorflow as tf
+import tensorflow.python.keras.backend as K
 from keras.utils import plot_model
 import matplotlib.pyplot as plt
 import glob
@@ -52,10 +54,10 @@ plt.ioff()
 # Finds all the hdf5 files in a given directory
 global onlyfiles
 onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
-runname = 'hyperasglamdringtest2'
+runname = str(sys.argv[1])
 hexmethod='oversampling'
 homedir='/users/exet4487/'
-trialsfile=homedir+'trials/'+runname+'.p'
+trialsfile=homedir+'trials/'+runname+'.npy'
 
 global Trutharr
 Trutharr = []
@@ -77,7 +79,7 @@ for file in onlyfiles[20:30]:
         truid.append(value)
     inputdata.close()
 
-for file in onlyfiles[:10]:
+for file in onlyfiles[:20]:
     try:
         inputdata = h5py.File(file, 'r')
     except OSError:
@@ -115,7 +117,7 @@ def data():
         
         nofiles = 0
         i = 0  # No. events loaded in total
-        filelist = onlyfiles[10:20]
+        filelist = onlyfiles[20:30]
         global validevents
         global valid2
         validevents=[]
@@ -183,7 +185,7 @@ def data():
         global train2
         trainevents=[]
         train2=[]
-        filelist = onlyfiles[:10]
+        filelist = onlyfiles[:20]
         for file in filelist:
             try:
                 inputdata = h5py.File(file, 'r')
@@ -247,51 +249,49 @@ def data():
 
 def create_model(train_generator,validation_generator):
     inpshape=(None,54,54,1)
-
-    model = Sequential()
-    model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
-                         input_shape=inpshape,
-                         padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
-    model.add(BatchNormalization())
-    
-    model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
-                         padding='same', return_sequences=True,dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}},kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}})))
-    model.add(BatchNormalization())
-    
-    model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
-                         padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
-    model.add(BatchNormalization())
-    if {{choice(['three','four'])}}=='four':
+    strategy=tf.distribute.MirroredStrategy()
+    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+    with strategy.scope():
+        model = Sequential()
         model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
-    padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
+                             input_shape=inpshape,
+                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
+        
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
+                             padding='same', return_sequences=True,dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}},kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}})))
+        model.add(BatchNormalization())
+        
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
+                             padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
+        model.add(BatchNormalization())
+        if {{choice(['three','four'])}}=='four':
+            model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
+                                 padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
+            model.add(BatchNormalization())
 
-    model.add(BatchNormalization())
-    model.add(GlobalAveragePooling3D())
-    model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
-    model.add(Dense(2, activation='softmax'))
-
-    # Compile the model
-    model.compile(
-        loss='binary_crossentropy',
-        optimizer='Adam',
-        metrics=['binary_accuracy'])
-    
-    '''early_stop = EarlyStopping(
-    monitor='val_loss',
-    min_delta=0,
-    patience=10,
-    verbose=1,
-    mode='auto')'''
+        model.add(GlobalAveragePooling3D())
+        model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
+        model.add(Dense(2, activation='softmax'))
+        # Compile the model
+        model.compile(loss='binary_crossentropy',
+                      optimizer='Adam',
+                      metrics=['binary_accuracy'])
+        '''early_stop = EarlyStopping(
+        monitor='val_loss',
+        min_delta=0,
+        patience=10,
+        verbose=1,
+        mode='auto')'''
     
     # Code for ensuring no contamination between training and test data.
-    lentrain=19574
+    lentrain=19574*2
     lentruth=19600
 # Train the network
     history = model.fit(
         train_generator,
         steps_per_epoch=lentrain/50.0,
-        epochs=1,
+        epochs=10,
         verbose=0,
         workers=0,
         use_multiprocessing=False,
@@ -314,15 +314,18 @@ def create_model(train_generator,validation_generator):
 
 trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/jobs/jobs',exp_key=runname)
 
-run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=300,trials=trialsinit,keep_temp=True)
+run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=50,trials=trialsinit,keep_temp=True)
 
 print('best run:', run)
 print(trialsinit)
 print(dir(trialsinit))
 print(len(trialsinit))
 print("----------trials-------------")
+trialsdict={}
 for i in trialsinit.trials:
     vals = i.get('misc').get('vals')
     results = i.get('result').get('loss')
     print(vals,results)
+    trialsdict[str(vals)]=str(results)
+np.save(trialsfile,trialsdict)
 #pickle.dump(trialsinit, open(trialsfile, "wb"))

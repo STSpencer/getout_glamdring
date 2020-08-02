@@ -36,6 +36,21 @@ except:
     pass
 
 try:
+    import tensorflow as tf
+except:
+    pass
+
+try:
+    from tensorflow.compat.v1 import ConfigProto
+except:
+    pass
+
+try:
+    from tensorflow.compat.v1 import Session
+except:
+    pass
+
+try:
     from keras.utils import HDF5Matrix
 except:
     pass
@@ -86,12 +101,7 @@ except:
     pass
 
 try:
-    from keras import backend as K
-except:
-    pass
-
-try:
-    import tensorflow as tf
+    import tensorflow.python.keras.backend as K
 except:
     pass
 
@@ -220,7 +230,7 @@ def hardcode_valid():
     
     nofiles = 0
     i = 0  # No. events loaded in total
-    filelist = onlyfiles[10:20]
+    filelist = onlyfiles[20:30]
     global validevents
     global valid2
     validevents=[]
@@ -288,7 +298,7 @@ def hardcode_train():
     global train2
     trainevents=[]
     train2=[]
-    filelist = onlyfiles[:10]
+    filelist = onlyfiles[:20]
     for file in filelist:
         try:
             inputdata = h5py.File(file, 'r')
@@ -353,51 +363,49 @@ validation_generator=hardcode_valid()
 def keras_fmin_fnct(space):
 
     inpshape=(None,54,54,1)
-
-    model = Sequential()
-    model.add(ConvLSTM2D(filters=space['filters'], kernel_size=space['kernel_size'],
-                         input_shape=inpshape,
-                         padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2(space['l2']),dropout=space['l2_1'],recurrent_dropout=space['l2_2']))
-    model.add(BatchNormalization())
-    
-    model.add(ConvLSTM2D(filters=space['filters_1'], kernel_size=space['kernel_size_1'],
-                         padding='same', return_sequences=True,dropout=space['l2_3'],recurrent_dropout=space['l2_4'],kernel_regularizer=keras.regularizers.l2(space['l2_5'])))
-    model.add(BatchNormalization())
-    
-    model.add(ConvLSTM2D(filters=space['filters_2'], kernel_size=space['kernel_size_2'],
-                         padding='same', return_sequences=True,dropout=space['l2_6']))
-    model.add(BatchNormalization())
-    if space['l2_7']=='four':
-        model.add(ConvLSTM2D(filters=space['filters_3'], kernel_size=space['kernel_size_3'],
-    padding='same', return_sequences=True,dropout=space['l2_8']))
+    strategy=tf.distribute.MirroredStrategy()
+    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+    with strategy.scope():
+        model = Sequential()
+        model.add(ConvLSTM2D(filters=space['filters'], kernel_size=space['kernel_size'],
+                             input_shape=inpshape,
+                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2(space['l2']),dropout=space['l2_1'],recurrent_dropout=space['l2_2']))
         model.add(BatchNormalization())
+        
+        model.add(ConvLSTM2D(filters=space['filters_1'], kernel_size=space['kernel_size_1'],
+                             padding='same', return_sequences=True,dropout=space['l2_3'],recurrent_dropout=space['l2_4'],kernel_regularizer=keras.regularizers.l2(space['l2_5'])))
+        model.add(BatchNormalization())
+        
+        model.add(ConvLSTM2D(filters=space['filters_2'], kernel_size=space['kernel_size_2'],
+                             padding='same', return_sequences=True,dropout=space['l2_6']))
+        model.add(BatchNormalization())
+        if space['l2_7']=='four':
+            model.add(ConvLSTM2D(filters=space['filters_3'], kernel_size=space['kernel_size_3'],
+                                 padding='same', return_sequences=True,dropout=space['l2_8']))
+            model.add(BatchNormalization())
 
-    model.add(BatchNormalization())
-    model.add(GlobalAveragePooling3D())
-    model.add(Dense(space['Dense'],activation='relu'))
-    model.add(Dense(2, activation='softmax'))
-
-    # Compile the model
-    model.compile(
-        loss='binary_crossentropy',
-        optimizer='Adam',
-        metrics=['binary_accuracy'])
-    
-    '''early_stop = EarlyStopping(
-    monitor='val_loss',
-    min_delta=0,
-    patience=10,
-    verbose=1,
-    mode='auto')'''
+        model.add(GlobalAveragePooling3D())
+        model.add(Dense(space['Dense'],activation='relu'))
+        model.add(Dense(2, activation='softmax'))
+        # Compile the model
+        model.compile(loss='binary_crossentropy',
+                      optimizer='Adam',
+                      metrics=['binary_accuracy'])
+        '''early_stop = EarlyStopping(
+        monitor='val_loss',
+        min_delta=0,
+        patience=10,
+        verbose=1,
+        mode='auto')'''
     
     # Code for ensuring no contamination between training and test data.
-    lentrain=19574
+    lentrain=19574*2
     lentruth=19600
 # Train the network
     history = model.fit(
         train_generator,
         steps_per_epoch=lentrain/50.0,
-        epochs=1,
+        epochs=10,
         verbose=0,
         workers=0,
         use_multiprocessing=False,
