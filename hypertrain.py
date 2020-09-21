@@ -48,7 +48,7 @@ from hyperas.distributions import choice, uniform
 from hyperopt import Trials, STATUS_OK, tpe, mongoexp
 import pickle
 import tempfile
-
+from os import path
 plt.ioff()
 
 # Finds all the hdf5 files in a given directory
@@ -58,45 +58,6 @@ runname = str(sys.argv[1])
 hexmethod='oversampling'
 homedir='/users/exet4487/'
 trialsfile=homedir+'trials/'+runname+'.npy'
-
-global Trutharr
-Trutharr = []
-Train2=[]
-truid=[]
-print(onlyfiles,len(onlyfiles))
-
-# Find true event classes for test data to construct confusion matrix.
-for file in onlyfiles[20:30]:
-    try:
-        inputdata = h5py.File(file, 'r')
-    except OSError:
-        continue
-    labelsarr = np.asarray(inputdata['isGamma'][:])
-    idarr = np.asarray(inputdata['id'][:])
-    for value in labelsarr:
-        Trutharr.append(value)
-    for value in idarr:
-        truid.append(value)
-    inputdata.close()
-
-for file in onlyfiles[:20]:
-    try:
-        inputdata = h5py.File(file, 'r')
-    except OSError:
-        continue
-    labelsarr = np.asarray(inputdata['isGamma'][:])
-    for value in labelsarr:
-        Train2.append(value)
-    inputdata.close()
-
-print('lentruth', len(Trutharr))
-print('lentrain',len(Train2))
-global lentrain
-global lentruth
-lentrain=len(Train2)
-lentruth=len(Trutharr)
-np.save(homedir+'truesim/truthvals_'+runname+'.npy',np.asarray(Trutharr))
-np.save(homedir+'idsim/idvals_'+runname+'.npy',np.asarray(truid))
 
 # Define model architecture.
 if hexmethod in ['axial_addressing','image_shifting']:
@@ -117,7 +78,7 @@ def data():
         
         nofiles = 0
         i = 0  # No. events loaded in total
-        filelist = onlyfiles[20:30]
+        filelist = onlyfiles[-10:]
         global validevents
         global valid2
         validevents=[]
@@ -253,23 +214,32 @@ def create_model(train_generator,validation_generator):
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     with strategy.scope():
         model = Sequential()
-        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
                              input_shape=inpshape,
                              padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
         
-        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
-                             padding='same', return_sequences=True,dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}},kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}})))
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
         
-        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
-                             padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+                             padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
-        if {{choice(['three','four'])}}=='four':
-            model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
-                                 padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+                             padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+        model.add(BatchNormalization())
+        if {{choice(['four','five','six'])}}=='five':
+            model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+                                 padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
             model.add(BatchNormalization())
-
+        if {{choice(['four','five','six'])}}=='six':
+            model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+                                 padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+            model.add(BatchNormalization())
+            model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+                                 padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+            model.add(BatchNormalization())
         model.add(GlobalAveragePooling3D())
         model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
         model.add(Dense(2, activation='softmax'))
@@ -291,30 +261,34 @@ def create_model(train_generator,validation_generator):
     history = model.fit(
         train_generator,
         steps_per_epoch=lentrain/50.0,
-        epochs=10,
+        epochs=15,
         verbose=0,
         workers=0,
         use_multiprocessing=False,
         shuffle=True,validation_data=validation_generator,validation_steps=lentruth/50.0)
     score, acc=model.evaluate(validation_generator,steps=lentruth/50.0)
+    modelnumber=next(tempfile._get_candidate_names())
+    modelcode=np.random.randint(0,1e10)
     out = {'loss': -acc,
         'score': score,
+        'modelno':str(modelnumber)+str(modelcode),
         'status': STATUS_OK,
         'model_params': model.summary()
     }
+    model.save('/users/exet4487/hypermodels/'+str(modelnumber)+str(modelcode)+'.h5')
     # optionally store a dump of your model here so you can get it from the database later                                                                                                   
-    temp_name = tempfile.gettempdir()+'/'+next(tempfile._get_candidate_names()) + '.h5'
+    temp_name = tempfile.gettempdir()+'/'+modelnumber + '.h5'
     model.save(temp_name)
-    with open(temp_name, 'rb') as infile:
-        model_bytes = infile.read()
-    out['model_serial'] = model_bytes
+    #with open(temp_name, 'rb') as infile:
+    #model_bytes = infile.read()
+    #out['model_serial'] = model_bytes
     return out
 
     # Plot training accuracy/loss.
 
 trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/jobs/jobs',exp_key=runname)
 
-run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=50,trials=trialsinit,keep_temp=True)
+run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=250,trials=trialsinit,keep_temp=True)
 
 print('best run:', run)
 print(trialsinit)
