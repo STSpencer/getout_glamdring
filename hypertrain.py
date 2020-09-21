@@ -224,21 +224,21 @@ def create_model(train_generator,validation_generator):
         model.add(BatchNormalization())
         
         model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                             padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
         model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                             padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
         if {{choice(['four','five','six'])}}=='five':
             model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                                 padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
             model.add(BatchNormalization())
         if {{choice(['four','five','six'])}}=='six':
             model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                                 padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
             model.add(BatchNormalization())
             model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                                 padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
             model.add(BatchNormalization())
         model.add(GlobalAveragePooling3D())
         model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
@@ -288,7 +288,7 @@ def create_model(train_generator,validation_generator):
 
 trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/jobs/jobs',exp_key=runname)
 
-run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=250,trials=trialsinit,keep_temp=True)
+run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=500,trials=trialsinit,keep_temp=True)
 
 print('best run:', run)
 print(trialsinit)
