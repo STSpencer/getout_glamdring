@@ -3,10 +3,11 @@ from keras.models import load_model
 import tempfile
 import matplotlib.pyplot as plt
 import numpy as np
+import pymongo
 
 expkey='longtest7'
 c = MongoClient('mongodb://exet4487:admin123@192.168.0.200:27017/jobs')
-best_model = c['jobs']['jobs'].find_one({'exp_key': expkey}, sort=[('result.loss', -1)])
+best_model = c['jobs']['jobs'].find_one({'exp_key': expkey,'result.status':'ok'}, sort=[('result.loss',pymongo.ASCENDING)])
 
 print(best_model)
 #raise KeyboardInterrupt
@@ -14,7 +15,7 @@ j=0
 losses=[]
 
 for i in c['jobs']['jobs'].find({'exp_key':expkey,'result.status':'ok'}):
-    print(i['result'])
+    print(i)
     losses.append(i['result']['loss'])
     j=j+1
     print(j)
