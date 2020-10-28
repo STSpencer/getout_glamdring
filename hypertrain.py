@@ -53,7 +53,7 @@ plt.ioff()
 
 # Finds all the hdf5 files in a given directory
 global onlyfiles
-onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
+onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080point/*.hdf5'))
 runname = str(sys.argv[1])
 hexmethod='oversampling'
 homedir='/users/exet4487/'
@@ -71,7 +71,7 @@ else:
 def data():
     def hardcode_valid():
         hexmethod='oversampling'
-        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080point/*.hdf5'))
         batch_size=50
         """ Generates training/test sequences on demand
         """
@@ -135,7 +135,7 @@ def data():
 
     def hardcode_train():
         hexmethod='oversampling'
-        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080point/*.hdf5'))
         batch_size=50
         """ Generates training/test sequences on demand
         """
@@ -261,7 +261,7 @@ def create_model(train_generator,validation_generator):
     history = model.fit(
         train_generator,
         steps_per_epoch=lentrain/50.0,
-        epochs=15,
+        epochs=30,
         verbose=0,
         workers=0,
         use_multiprocessing=False,
@@ -288,7 +288,7 @@ def create_model(train_generator,validation_generator):
 
 trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/jobs/jobs',exp_key=runname)
 
-run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=500,trials=trialsinit,keep_temp=True)
+run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=350,trials=trialsinit,keep_temp=True)
 
 print('best run:', run)
 print(trialsinit)
