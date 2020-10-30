@@ -69,7 +69,7 @@ def get_confusion_matrix_one_hot(runname,homedir,model_results, truth):
     fig,ax=plot_confusion_matrix(conf_mat=cm,figsize=(5,5))
     plt.xlabel('Predicted Label')
     plt.ylabel('True Label')
-    plt.savefig(homedir+'Figures/'+runname+'confmat.png')
+    plt.savefig(homedir+'/Figures/'+runname+'confmat.png')
     fpr,tpr,thresholds=roc_curve(truth,np.asarray(mr2)[:,1])
     plt.figure()
     lw = 2
@@ -86,205 +86,12 @@ def get_confusion_matrix_one_hot(runname,homedir,model_results, truth):
     plt.xlabel('Signal Efficiency')
     plt.ylabel('Background Rejection')
     #plt.legend(loc="lower right")
-    plt.savefig(homedir+'Figures/'+runname+'_sigeff.png')
-    np.save(homedir+'confmatdata/'+runname+'_sigef.npy',fpr)
-    np.save(homedir+'confmatdata/'+runname+'_bgrej.npy',tpr)
+    plt.savefig(homedir+'/Figures/'+runname+'_sigeff.png')
+    np.save(homedir+'/confmatdata/'+runname+'_sigef.npy',fpr)
+    np.save(homedir+'/confmatdata/'+runname+'_bgrej.npy',tpr)
     return cm
 
-def hardcode_valid():
-    batchflag='Valid'
-    hexmethod='oversampling'
-    onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
-    batch_size=50
-    """ Generates training/test sequences on demand
-    """
 
-    nofiles = 0
-    i = 0  # No. events loaded in total
-    global trainevents
-    global testevents
-    global train2
-    global test2
-    if batchflag == 'Train':
-        filelist = onlyfiles[:10]
-        for file in filelist:
-            try:
-                inputdata = h5py.File(file, 'r')
-            except OSError:
-                continue
-            trainevents = trainevents + inputdata['isGamma'][:].tolist()
-            train2 = train2 + inputdata['id'][:].tolist()
-            inputdata.close()
-
-    elif batchflag == 'Test':
-        filelist = onlyfiles[20:30]
-        global testevents
-        global test2
-        for file in filelist:
-            try:
-                inputdata = h5py.File(file, 'r')
-            except OSError:
-                continue
-            testevents = testevents + inputdata['isGamma'][:].tolist()
-            test2 = test2 + inputdata['id'][:].tolist()
-            inputdata.close()
-
-    elif batchflag == 'Valid':
-        filelist = onlyfiles[10:20]
-        global validevents
-        global valid2
-        for file in filelist:
-            inputdata = h5py.File(file, 'r')
-            validevents = validevents + inputdata['isGamma'][:].tolist()
-            valid2 = valid2 + inputdata['id'][:].tolist()
-            inputdata.close()
-    else:
-        print('Error: Invalid batchflag')
-        raise KeyboardInterrupt
-    
-    while True:
-        for file in filelist:
-            try:
-                inputdata = h5py.File(file, 'r')
-            except OSError:
-                continue
-            trainarr = np.asarray(inputdata[hexmethod][:, :, :, :])
-            labelsarr = np.asarray(inputdata['isGamma'][:])
-            idarr = np.asarray(inputdata['id'][:])
-            nofiles = nofiles + 1
-            inputdata.close()
-            notrigs=np.shape(trainarr)[0]
-            
-            for x in np.arange(np.shape(trainarr)[0]):
-                chargevals = []
-                for y in np.arange(4):
-                    chargevals.append(np.sum(trainarr[x,y,:,:]))
-
-                chargevals = np.argsort(chargevals)
-                chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
-                trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
-            training_sample_count = len(trainarr)
-            batches = int(training_sample_count / batch_size)
-            remainder_samples = training_sample_count % batch_size
-            i = i + 1000
-            countarr = np.arange(0, len(labelsarr))
-
-#            trainarr = (trainarr-np.amin(trainarr,axis=0))/(np.amax(trainarr,axis=0)-np.amin(trainarr,axis=0))
-            if remainder_samples:
-                batches = batches + 1
-
-            # generate batches of samples
-            for idx in list(range(0, batches)):
-                if idx == batches - 1:
-                    batch_idxs = countarr[idx * batch_size:]
-                else:
-                    batch_idxs = countarr[idx *
-                                          batch_size:idx *
-                                          batch_size +
-                                          batch_size]
-                X = trainarr[batch_idxs]
-                X = np.nan_to_num(X)
-                Y = keras.utils.to_categorical(
-                    labelsarr[batch_idxs], num_classes=2)
-                yield (np.array(X), np.array(Y))
-
-def hardcode_train():
-    batchflag='Train'
-    hexmethod='oversampling'
-    onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
-    batch_size=50
-    """ Generates training/test sequences on demand
-    """
-
-    nofiles = 0
-    i = 0  # No. events loaded in total
-    global trainevents
-    global testevents
-    global train2
-    global test2
-    if batchflag == 'Train':
-        filelist = onlyfiles[:10]
-        for file in filelist:
-            try:
-                inputdata = h5py.File(file, 'r')
-            except OSError:
-                continue
-            trainevents = trainevents + inputdata['isGamma'][:].tolist()
-            train2 = train2 + inputdata['id'][:].tolist()
-            inputdata.close()
-
-    elif batchflag == 'Test':
-        filelist = onlyfiles[20:30]
-        global testevents
-        global test2
-        for file in filelist:
-            try:
-                inputdata = h5py.File(file, 'r')
-            except OSError:
-                continue
-            testevents = testevents + inputdata['isGamma'][:].tolist()
-            test2 = test2 + inputdata['id'][:].tolist()
-            inputdata.close()
-
-    elif batchflag == 'Valid':
-        filelist = onlyfiles[20:30]
-        global validevents
-        global valid2
-        for file in filelist:
-            inputdata = h5py.File(file, 'r')
-            validevents = validevents + inputdata['isGamma'][:].tolist()
-            valid2 = valid2 + inputdata['id'][:].tolist()
-            inputdata.close()
-    else:
-        print('Error: Invalid batchflag')
-        raise KeyboardInterrupt
-    
-    while True:
-        for file in filelist:
-            try:
-                inputdata = h5py.File(file, 'r')
-            except OSError:
-                continue
-            trainarr = np.asarray(inputdata[hexmethod][:, :, :, :])
-            labelsarr = np.asarray(inputdata['isGamma'][:])
-            idarr = np.asarray(inputdata['id'][:])
-            nofiles = nofiles + 1
-            inputdata.close()
-            notrigs=np.shape(trainarr)[0]
-            
-            for x in np.arange(np.shape(trainarr)[0]):
-                chargevals = []
-                for y in np.arange(4):
-                    chargevals.append(np.sum(trainarr[x,y,:,:]))
-
-                chargevals = np.argsort(chargevals)
-                chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
-                trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
-                    
-            training_sample_count = len(trainarr)
-            batches = int(training_sample_count / batch_size)
-            remainder_samples = training_sample_count % batch_size
-            i = i + 1000
-            countarr = np.arange(0, len(labelsarr))
-
-#            trainarr = (trainarr-np.amin(trainarr,axis=0))/(np.amax(trainarr,axis=0)-np.amin(trainarr,axis=0))
-            if remainder_samples:
-                batches = batches + 1
-
-            # generate batches of samples
-            for idx in list(range(0, batches)):
-                if idx == batches - 1:
-                    batch_idxs = countarr[idx * batch_size:]
-                else:
-                    batch_idxs = countarr[idx *
-                                          batch_size:idx *
-                                          batch_size +
-                                          batch_size]
-                X = trainarr[batch_idxs]
-                X = np.nan_to_num(X)
-                Y = keras.utils.to_categorical(
-                    labelsarr[batch_idxs], num_classes=2)
-                yield (np.array(X), np.array(Y))
 
 def generate_training_sequences(onlyfiles,batch_size, batchflag,hexmethod):
     """ Generates training/test sequences on demand
@@ -297,19 +104,20 @@ def generate_training_sequences(onlyfiles,batch_size, batchflag,hexmethod):
     global train2
     global test2
     if batchflag == 'Train':
-        filelist = onlyfiles[:120]
+        filelist = onlyfiles[20:-50]
         print('train', filelist)
         for file in filelist:
             try:
                 inputdata = h5py.File(file, 'r')
             except OSError:
+                print('File failed to load',file)
                 continue
             trainevents = trainevents + inputdata['isGamma'][:].tolist()
             train2 = train2 + inputdata['id'][:].tolist()
             inputdata.close()
 
     elif batchflag == 'Test':
-        filelist = onlyfiles[120:160]
+        filelist = onlyfiles[-50:-30]
         print('test', filelist)
         global testevents
         global test2
@@ -317,18 +125,23 @@ def generate_training_sequences(onlyfiles,batch_size, batchflag,hexmethod):
             try:
                 inputdata = h5py.File(file, 'r')
             except OSError:
+                print('File failed to load',file)
                 continue
             testevents = testevents + inputdata['isGamma'][:].tolist()
             test2 = test2 + inputdata['id'][:].tolist()
             inputdata.close()
 
     elif batchflag == 'Valid':
-        filelist = onlyfiles[160:]
+        filelist = onlyfiles[-30:-10]
         print('valid', filelist)
         global validevents
         global valid2
         for file in filelist:
-            inputdata = h5py.File(file, 'r')
+            try:
+                inputdata = h5py.File(file, 'r')
+            except OSError:
+                print('File failed to load',file)
+                continue
             validevents = validevents + inputdata['isGamma'][:].tolist()
             valid2 = valid2 + inputdata['id'][:].tolist()
             inputdata.close()
@@ -381,68 +194,3 @@ def generate_training_sequences(onlyfiles,batch_size, batchflag,hexmethod):
                 Y = keras.utils.to_categorical(
                     labelsarr[batch_idxs], num_classes=2)
                 yield (np.array(X), np.array(Y))
-
-def generate_real_sequences(onlyfiles,batch_size,hexmethod):
-    """ Generates real test sequences on demand
-    """
-    nofiles = 0
-    i = 0  # No. events loaded in total
-    global testevents
-    global test2
-    filelist = onlyfiles
-    print('test', filelist)
-    for file in filelist:
-        try:
-            inputdata = h5py.File(file, 'r')
-        except OSError:
-            continue
-        test2 = test2 + inputdata['id'][:].tolist()
-        inputdata.close()
-
-    while True:
-        for file in filelist:
-            try:
-                inputdata = h5py.File(file, 'r')
-            except OSError:
-                continue
-            trainarr = np.asarray(inputdata[hexmethod][:, :, :, :])
-            idarr = np.asarray(inputdata['id'][:])
-            nofiles = nofiles + 1
-            inputdata.close()
-            notrigs=np.shape(trainarr)[0]
-            
-            for x in np.arange(np.shape(trainarr)[0]):
-                chargevals = []
-                for y in np.arange(4):
-                    chargevals.append(np.sum(trainarr[x,y,:,:]))
-
-                chargevals = np.argsort(chargevals)
-                chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
-                
-                trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
-
-                            
-            training_sample_count = len(trainarr)
-            batches = int(training_sample_count / batch_size)
-            remainder_samples = training_sample_count % batch_size
-            i = i + len(idarr)
-            countarr = np.arange(0, len(idarr))
-
-#            trainarr = (trainarr-np.amin(trainarr,axis=0))/(np.amax(trainarr,axis=0)-np.amin(trainarr,axis=0))
-            if remainder_samples:
-                batches = batches + 1
-
-            # generate batches of samples
-            for idx in list(range(0, batches)):
-                if idx == batches - 1:
-                    batch_idxs = countarr[idx * batch_size:]
-                else:
-                    batch_idxs = countarr[idx *
-                                          batch_size:idx *
-                                          batch_size +
-                                          batch_size]
-                X = trainarr[batch_idxs]
-                events=idarr[batch_idxs]
-                Y=events.tolist()
-                X = np.nan_to_num(X)
-                yield (np.array(X),Y)
