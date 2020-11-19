@@ -104,7 +104,7 @@ def generate_training_sequences(onlyfiles,batch_size, batchflag,hexmethod):
     global train2
     global test2
     if batchflag == 'Train':
-        filelist = onlyfiles[20:-50]
+        filelist = onlyfiles[20:-90]
         print('train', filelist)
         for file in filelist:
             try:
@@ -117,7 +117,7 @@ def generate_training_sequences(onlyfiles,batch_size, batchflag,hexmethod):
             inputdata.close()
 
     elif batchflag == 'Test':
-        filelist = onlyfiles[-50:-30]
+        filelist = onlyfiles[-90:-50]
         print('test', filelist)
         global testevents
         global test2
@@ -132,7 +132,7 @@ def generate_training_sequences(onlyfiles,batch_size, batchflag,hexmethod):
             inputdata.close()
 
     elif batchflag == 'Valid':
-        filelist = onlyfiles[-30:-10]
+        filelist = onlyfiles[-50:-10]
         print('valid', filelist)
         global validevents
         global valid2

@@ -71,7 +71,7 @@ truid=[]
 print(onlyfiles,len(onlyfiles))
 
 # Find true event classes for test data to construct confusion matrix.
-for file in onlyfiles[-90:-50]:
+for file in onlyfiles[-50:-30]:
     try:
         inputdata = h5py.File(file, 'r')
     except OSError:
@@ -85,7 +85,7 @@ for file in onlyfiles[-90:-50]:
         truid.append(value)
     inputdata.close()
 
-for file in onlyfiles[20:-90]:
+for file in onlyfiles[20:-50]:
     try:
         inputdata = h5py.File(file, 'r')
     except OSError:
@@ -142,7 +142,7 @@ history = model.fit_generator(
         50,
                                 'Train',hexmethod),
     steps_per_epoch=lentrain/50.0,
-    epochs=100,
+    epochs=10,
     verbose=2,
     workers=0,callbacks=[model_checkpoint_callback],
     use_multiprocessing=False,

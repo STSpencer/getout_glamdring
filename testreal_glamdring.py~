@@ -56,8 +56,7 @@ realdata = sorted(glob.glob('/mnt/extraspace/exet4487/Real64080/*.hdf5'))
 runname = str(sys.argv[1])
 runcode = 64080
 hexmethod='oversampling'
-#modfile='/users/exet4487/hypermodels/'+str(runname)+'.h5' #Model file to use For hypermodel selection
-modfile='/mnt/extraspace/exet4487/ai40p1ln3885525519_checkpoint/'+str(runname) #For running checkpoints with longtrain
+modfile='/users/exet4487/hypermodels/'+str(runname)+'.h5' #Model file to use
 evlist=[]
 
 for file in realdata:
@@ -198,8 +197,8 @@ gen=generate_real_evnos(realdata,batchsize,hexmethod)
 
 for i in np.arange(no_steps):
     outp=next(gen)
+    print(i,outp,type(outp))
     eventnumbers.append(outp[0])
 
-eventnumbers=np.asarray(eventnumbers)
 np.save('/users/exet4487/events/'+str(runcode)+'_'+runname+'_eventnos_REAL.npy', eventnumbers)
 print(len(pred),eventnumbers,np.shape(eventnumbers),len(eventnumbers))

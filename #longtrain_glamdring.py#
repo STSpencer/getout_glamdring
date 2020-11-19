@@ -85,7 +85,7 @@ for file in onlyfiles[-90:-50]:
         truid.append(value)
     inputdata.close()
 
-for file in onlyfiles[20:-90]:
+for file in onlyfiles[20:-50]:
     try:
         inputdata = h5py.File(file, 'r')
     except OSError:
