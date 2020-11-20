@@ -242,13 +242,13 @@ def create_model(train_generator,validation_generator):
 
         model.add(GlobalAveragePooling3D())
         
-        if {{choice{['l7','no'])}}=='l7':
+        if {{choice(['l7','no'])}}=='l7':
             model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
 
-        if {{choice{['l8','no'])}}=='l8':
+        if {{choice(['l8','no'])}}=='l8':
             model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
             
-        if {{choice{['l9','no'])}}=='l9':
+        if {{choice(['l9','no'])}}=='l9':
             model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
 
         model.add(Dense(2, activation='softmax'))
