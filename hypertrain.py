@@ -53,7 +53,7 @@ plt.ioff()
 
 # Finds all the hdf5 files in a given directory
 global onlyfiles
-onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080point/*.hdf5'))
+onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
 runname = str(sys.argv[1])
 hexmethod='oversampling'
 homedir='/users/exet4487/'
@@ -71,14 +71,14 @@ else:
 def data():
     def hardcode_valid():
         hexmethod='oversampling'
-        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080point/*.hdf5'))
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
         batch_size=50
         """ Generates training/test sequences on demand
         """
         
         nofiles = 0
         i = 0  # No. events loaded in total
-        filelist = onlyfiles[-10:]
+        filelist = onlyfiles[-20:]
         global validevents
         global valid2
         validevents=[]
@@ -135,7 +135,7 @@ def data():
 
     def hardcode_train():
         hexmethod='oversampling'
-        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080point/*.hdf5'))
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
         batch_size=50
         """ Generates training/test sequences on demand
         """
@@ -227,21 +227,30 @@ def create_model(train_generator,validation_generator):
                              padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
         model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                             padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
-        if {{choice(['four','five','six'])}}=='five':
+        
+        if {{choice(['l5','no'])}}=='l5':
             model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                                 padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
             model.add(BatchNormalization())
-        if {{choice(['four','five','six'])}}=='six':
+            
+        if {{choice(['l6','no'])}}=='l6':
             model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+                                 padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
             model.add(BatchNormalization())
-            model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
-            model.add(BatchNormalization())
+
         model.add(GlobalAveragePooling3D())
-        model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
+        
+        if {{choice{['l7','no'])}}=='l7':
+            model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
+
+        if {{choice{['l8','no'])}}=='l8':
+            model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
+            
+        if {{choice{['l9','no'])}}=='l9':
+            model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
+
         model.add(Dense(2, activation='softmax'))
         # Compile the model
         model.compile(loss='binary_crossentropy',
@@ -256,21 +265,20 @@ def create_model(train_generator,validation_generator):
     
     # Code for ensuring no contamination between training and test data.
     lentrain=19574*2
-    lentruth=19600
+    lentruth=19600*2
 # Train the network
     history = model.fit(
         train_generator,
         steps_per_epoch=lentrain/50.0,
-        epochs=30,
+        epochs=10,
         verbose=0,
         workers=0,
         use_multiprocessing=False,
         shuffle=True,validation_data=validation_generator,validation_steps=lentruth/50.0)
-    score, acc=model.evaluate(validation_generator,steps=lentruth/50.0)
+    acc=np.amax(history.history['val_acc']) 
     modelnumber=next(tempfile._get_candidate_names())
     modelcode=np.random.randint(0,1e10)
     out = {'loss': -acc,
-        'score': score,
         'modelno':str(modelnumber)+str(modelcode),
         'status': STATUS_OK,
         'model_params': model.summary()
@@ -288,7 +296,7 @@ def create_model(train_generator,validation_generator):
 
 trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/jobs/jobs',exp_key=runname)
 
-run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=350,trials=trialsinit,keep_temp=True)
+run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=1010,trials=trialsinit,keep_temp=True)
 
 print('best run:', run)
 print(trialsinit)
