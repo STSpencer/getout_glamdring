@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pymongo
 
-expkey='Crab64080opt3'
+#expkey='Crab64080opt3'
+expkey='NewCrab64080'
 c = MongoClient('mongodb://exet4487:admin123@192.168.0.200:27017/jobs')
 best_model = c['jobs']['jobs'].find_one({'exp_key': expkey,'result.status':'ok'}, sort=[('result.loss',pymongo.ASCENDING)])
 
@@ -16,7 +17,8 @@ losses=[]
 modelnos=[]
 
 for i in c['jobs']['jobs'].find({'exp_key':expkey,'result.status':'ok'}):
-    if j>344:
+    #if j>344:
+    if j>999:
         break
     
     print(i)

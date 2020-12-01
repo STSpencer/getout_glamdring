@@ -243,14 +243,14 @@ def create_model(train_generator,validation_generator):
         model.add(GlobalAveragePooling3D())
         
         if {{choice(['l7','no'])}}=='l7':
-            model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
-
+            model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
+            model.add(Dropout({{uniform(0,1)}}))
         if {{choice(['l8','no'])}}=='l8':
-            model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
-            
+            model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
+            model.add(Dropout({{uniform(0,1)}}))
         if {{choice(['l9','no'])}}=='l9':
-            model.add(Dense({{choice([10,50,100,200])}},dropout={{uniform(0,1)}},activation='relu'))
-
+            model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
+            model.add(Dropout({{uniform(0,1)}}))
         model.add(Dense(2, activation='softmax'))
         # Compile the model
         model.compile(loss='binary_crossentropy',
@@ -270,12 +270,14 @@ def create_model(train_generator,validation_generator):
     history = model.fit(
         train_generator,
         steps_per_epoch=lentrain/50.0,
-        epochs=10,
+        epochs=5,
         verbose=0,
         workers=0,
         use_multiprocessing=False,
         shuffle=True,validation_data=validation_generator,validation_steps=lentruth/50.0)
-    acc=np.amax(history.history['val_acc']) 
+    print(history.history)
+    print(history.history.keys())
+    acc=np.amax(history.history['val_binary_accuracy']) 
     modelnumber=next(tempfile._get_candidate_names())
     modelcode=np.random.randint(0,1e10)
     out = {'loss': -acc,
