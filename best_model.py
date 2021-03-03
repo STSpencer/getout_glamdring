@@ -6,9 +6,11 @@ import numpy as np
 import pymongo
 
 #expkey='Crab64080opt3'
-expkey='NewCrab64080'
-c = MongoClient('mongodb://exet4487:admin123@192.168.0.200:27017/jobs')
-best_model = c['jobs']['jobs'].find_one({'exp_key': expkey,'result.status':'ok'}, sort=[('result.loss',pymongo.ASCENDING)])
+expkey='febtry'
+#c = MongoClient('mongodb://exet4487:admin123@192.168.0.200:27017/jobs')
+c = MongoClient('mongodb://exet4487:admin123@192.168.0.200:27017/'+expkey)
+print(c['jobs'])
+best_model = c[expkey]['jobs'].find_one({'exp_key': expkey,'result.status':'ok'}, sort=[('result.loss',pymongo.ASCENDING)])
 
 
 #raise KeyboardInterrupt
@@ -16,16 +18,16 @@ j=0
 losses=[]
 modelnos=[]
 
-for i in c['jobs']['jobs'].find({'exp_key':expkey,'result.status':'ok'}):
+for i in c[expkey]['jobs'].find({'exp_key':expkey,'result.status':'ok'}):
     #if j>344:
-    if j>999:
+    if j>1000:
         break
     
     print(i)
     print(dir(i['result']))
     print(i['result'].keys())
     losses.append(i['result']['loss'])
-    modelnos.append(i['result']['modelno'])
+#    modelnos.append(i['result']['modelno'])
     j=j+1
     print(j)
 
@@ -60,9 +62,9 @@ plt.savefig('/users/exet4487/Figures/convplot_'+expkey+'.png')
 
 percents=[50,55,60,65,70,75,80,85,90,95,100]
 
-print('Percentiles:')
+'''print('Percentiles:')
 for p in percents:
     i_near=abs(losses-np.percentile(losses,p,interpolation='nearest')).argmin()
     print(p,i_near,losses[i_near],modelnos[i_near])
-
+'''
 print(best_model)

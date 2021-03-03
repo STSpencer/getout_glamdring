@@ -49,11 +49,19 @@ from hyperopt import Trials, STATUS_OK, tpe, mongoexp
 import pickle
 import tempfile
 from os import path
+import pymongo
+from itertools import cycle
+from skimage.restoration import denoise_wavelet, denoise_bilateral
 plt.ioff()
+
+try:
+    os.system('rm -r /users/exet4487/getout_glamdring/__pycache__')
+except Exception:
+    print('No pycache found, continuing')
 
 # Finds all the hdf5 files in a given directory
 global onlyfiles
-onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
+onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crabrun2/*.hdf5'))
 runname = str(sys.argv[1])
 hexmethod='oversampling'
 homedir='/users/exet4487/'
@@ -71,14 +79,14 @@ else:
 def data():
     def hardcode_valid():
         hexmethod='oversampling'
-        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
-        batch_size=50
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crabrun2/*.hdf5'))
+        batch_size=20
         """ Generates training/test sequences on demand
         """
         
         nofiles = 0
         i = 0  # No. events loaded in total
-        filelist = onlyfiles[-20:]
+        filelist = onlyfiles[20:30]
         global validevents
         global valid2
         validevents=[]
@@ -110,6 +118,16 @@ def data():
                     chargevals = np.argsort(chargevals)
                     chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
                     trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
+                    '''
+                    #Image cleaning if needed
+                    for y in np.arange(4):
+                        im1=trainarr[x,y,:,:]
+                        im1=im1[:,:,0]
+                        im1=im1+abs(np.min(im1))
+                        im2=denoise_bilateral(im1,multichannel=False)
+                        im2=np.expand_dims(im2,axis=2)
+                        trainarr[x,y,:,:]=im2
+                    '''
                 training_sample_count = len(trainarr)
                 batches = int(training_sample_count / batch_size)
                 remainder_samples = training_sample_count % batch_size
@@ -135,8 +153,8 @@ def data():
 
     def hardcode_train():
         hexmethod='oversampling'
-        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crab64080/*.hdf5'))
-        batch_size=50
+        onlyfiles = sorted(glob.glob('/mnt/extraspace/exet4487/Crabrun2/*.hdf5'))
+        batch_size=20
         """ Generates training/test sequences on demand
         """
         
@@ -146,7 +164,7 @@ def data():
         global train2
         trainevents=[]
         train2=[]
-        filelist = onlyfiles[:20]
+        filelist = onlyfiles[:10]
         for file in filelist:
             try:
                 inputdata = h5py.File(file, 'r')
@@ -177,7 +195,16 @@ def data():
                     chargevals = np.argsort(chargevals)
                     chargevals = np.flip(chargevals,axis=0) #Flip to descending order.
                     trainarr[x, :, :, :] = trainarr[x, chargevals, :, :]
-                    
+                    '''
+                    #Image cleaning if needed
+                    for y in np.arange(4):
+                        im1=trainarr[x,y,:,:]
+                        im1=im1[:,:,0]
+                        im1=im1+abs(np.min(im1))
+                        im2=denoise_bilateral(im1,multichannel=False)
+                        im2=np.expand_dims(im2,axis=2)
+                        trainarr[x,y,:,:]=im2
+                    '''
                 training_sample_count = len(trainarr)
                 batches = int(training_sample_count / batch_size)
                 remainder_samples = training_sample_count % batch_size
@@ -209,48 +236,33 @@ def data():
     return train_generator, validation_generator
 
 def create_model(train_generator,validation_generator):
+    #K.clear_session()
     inpshape=(None,54,54,1)
     strategy=tf.distribute.MirroredStrategy()
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     with strategy.scope():
         model = Sequential()
-        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
                              input_shape=inpshape,
                              padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
-        
-        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
+    
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
+                             padding='same', return_sequences=True,dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}},kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}})))
         model.add(BatchNormalization())
         
-        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                             padding='same', return_sequences=True,kernel_regularizer=keras.regularizers.l2({{uniform(0,1)}}),dropout={{uniform(0,1)}},recurrent_dropout={{uniform(0,1)}}))
-        model.add(BatchNormalization())
-        model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
+        model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
                              padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
         model.add(BatchNormalization())
-        
-        if {{choice(['l5','no'])}}=='l5':
-            model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
-            model.add(BatchNormalization())
-            
-        if {{choice(['l6','no'])}}=='l6':
-            model.add(ConvLSTM2D(filters={{choice([10,20,30,40,50,60])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5),(6,6),(7,7)])}},
-                                 padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
+
+        if {{choice(['three','four'])}}=='four':
+            model.add(ConvLSTM2D(filters={{choice([10,20,30,40])}}, kernel_size={{choice([(2,2),(3, 3),(4,4),(5,5)])}},
+                      padding='same', return_sequences=True,dropout={{uniform(0,1)}}))
             model.add(BatchNormalization())
 
+        model.add(BatchNormalization())
         model.add(GlobalAveragePooling3D())
-        
-        if {{choice(['l7','no'])}}=='l7':
-            model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
-            model.add(Dropout({{uniform(0,1)}}))
-        if {{choice(['l8','no'])}}=='l8':
-            model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
-            model.add(Dropout({{uniform(0,1)}}))
-        if {{choice(['l9','no'])}}=='l9':
-            model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
-            model.add(Dropout({{uniform(0,1)}}))
+        model.add(Dense({{choice([10,50,100,200])}},activation='relu'))
         model.add(Dense(2, activation='softmax'))
         # Compile the model
         model.compile(loss='binary_crossentropy',
@@ -264,20 +276,22 @@ def create_model(train_generator,validation_generator):
         mode='auto')'''
     
     # Code for ensuring no contamination between training and test data.
-    lentrain=19574*2
-    lentruth=19600*2
+    lentrain=19574
+    lentruth=19600
 # Train the network
-    history = model.fit(
+    history = model.fit_generator(
         train_generator,
-        steps_per_epoch=lentrain/50.0,
-        epochs=5,
+        steps_per_epoch=lentrain/20.0,
+        epochs=1,
         verbose=0,
         workers=0,
         use_multiprocessing=False,
-        shuffle=True,validation_data=validation_generator,validation_steps=lentruth/50.0)
+        shuffle=True,validation_data=validation_generator,validation_steps=lentruth/20.0)
     print(history.history)
     print(history.history.keys())
-    acc=np.amax(history.history['val_binary_accuracy']) 
+    #acc=np.amax(history.history['val_binary_accuracy']) 
+
+    score, acc=model.evaluate_generator(validation_generator,steps=lentruth/20.0)
     modelnumber=next(tempfile._get_candidate_names())
     modelcode=np.random.randint(0,1e10)
     out = {'loss': -acc,
@@ -295,10 +309,17 @@ def create_model(train_generator,validation_generator):
     return out
 
     # Plot training accuracy/loss.
+myclient=pymongo.MongoClient("mongodb://192.168.0.200:27017/")
+mydb=myclient[runname]
+mydb.add_user('exet4487', 'admin123', roles=[{'role':'readWrite','db':runname}])
+mycol=mydb['test']
+result=mycol.insert_one({"test" : "test"})
 
-trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/jobs/jobs',exp_key=runname)
+print(myclient.list_database_names())
 
-run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=1010,trials=trialsinit,keep_temp=True)
+trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/'+runname+'/jobs',exp_key=runname)
+
+run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=1000,trials=trialsinit,keep_temp=True)
 
 print('best run:', run)
 print(trialsinit)
