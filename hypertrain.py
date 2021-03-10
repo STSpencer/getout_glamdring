@@ -335,7 +335,7 @@ print(myclient.list_database_names())
 
 trialsinit=mongoexp.MongoTrials('mongo://exet4487:admin123@192.168.0.200:27017/'+runname+'/jobs',exp_key=runname)
 
-run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=350,trials=trialsinit,keep_temp=True)
+run,model=optim.minimize(model=create_model,data=data,algo=tpe.suggest,max_evals=500,trials=trialsinit,keep_temp=True)
 
 print('best run:', run)
 print(trialsinit)
